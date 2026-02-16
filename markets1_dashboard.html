@@ -205,8 +205,17 @@
   refreshBtn.addEventListener("click", refresh);
 refresh();
 
-// Auto refresh every 5 minutes
-setInterval(refresh, 300000);
+// Smart auto refresh (only during market hours)
+setInterval(() => {
+  const now = new Date();
+  const hour = now.getHours();
+
+  // Only refresh between 8 AM and 6 PM
+  if (hour >= 8 && hour <= 18) {
+    refresh();
+  }
+}, 900000); // 15 minutes
+
 
 </script>
 </body>
