@@ -1,95 +1,27 @@
-import pandas as pd
-import yfinance as yf
-import requests
-from datetime import datetime
-
-# --- Configure what you track ---
-YF_TICKERS = {
-    "S&P 500 (SPY)": "SPY",
-    "NASDAQ 100 (QQQ)": "QQQ",
-    "Dow Jones (DIA)": "DIA",
-    "Nikkei 225": "^N225",
-    "Hang Seng": "^HSI",
-    "Euro Stoxx 50": "^STOXX50E",
-    "DAX": "^GDAXI",
-    "FTSE 100": "^FTSE",
-    "Gold": "GC=F",
-    "Oil (WTI)": "CL=F",
-    "US 10Y Yield": "^TNX",
-    "EUR/USD": "EURUSD=X",
-}
-
-COINGECKO = {
-    "Bitcoin": "bitcoin",
-    "Ethereum": "ethereum",
-}
-
-def fetch_yfinance_snapshot(tickers: dict) -> pd.DataFrame:
-    symbols = list(tickers.values())
-    data = yf.download(symbols, period="7d", interval="1d", auto_adjust=True, progress=False)["Close"]
-    if isinstance(data, pd.Series):
-        data = data.to_frame()
-    data = data.dropna(how="all")
-
-    rows = []
-    for label, sym in tickers.items():
-        if sym not in data.columns:
-            continue
-        s = data[sym].dropna()
-        if len(s) < 2:
-            continue
-        last = float(s.iloc[-1])
-        prev = float(s.iloc[-2])
-        chg = last - prev
-        pct = (chg / prev) * 100 if prev != 0 else 0.0
-        rows.append([label, sym, last, chg, pct])
-    return pd.DataFrame(rows, columns=["Market", "Symbol", "Last", "Change", "Change_%"])
-
-def fetch_coingecko_snapshot(coins: dict) -> pd.DataFrame:
-    ids = ",".join(coins.values())
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {"ids": ids, "vs_currencies": "usd", "include_24hr_change": "true"}
-    r = requests.get(url, params=params, timeout=20)
-    r.raise_for_status()
-    js = r.json()
-
-    rows = []
-    for label, coin_id in coins.items():
-        last = float(js[coin_id]["usd"])
-        pct = float(js[coin_id].get("usd_24h_change", 0.0))
-        chg = last * (pct / 100.0)
-        rows.append([label, coin_id, last, chg, pct])
-    return pd.DataFrame(rows, columns=["Market", "Symbol", "Last", "Change", "Change_%"])
-
-def to_html_dashboard(df: pd.DataFrame, out_file="markets_dashboard.html"):
-    df = df.copy()
-    df["Last"] = df["Last"].map(lambda x: f"{x:,.2f}")
-    df["Change"] = df["Change"].map(lambda x: f"{x:+,.2f}")
-    df["Change_%"] = df["Change_%"].map(lambda x: f"{x:+.2f}%")
-
-    html = f"""
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>THEVTIG | Global Markets Dashboard</title>
   <style>
-    body {{ font-family: Arial, sans-serif; margin: 0; background: #f7f9f8; color:#111; }}
-    header {{ background: #1b5e20; color: #fff; padding: 18px 22px; }}
-    header h1 {{ margin: 0; font-size: 20px; letter-spacing: .5px; }}
-    header p {{ margin: 6px 0 0; opacity: .9; }}
-    .wrap {{ padding: 18px 22px; max-width: 1100px; margin: 0 auto; }}
-    .grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }}
-    .card {{ background: #fff; border-radius: 10px; padding: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.06); border-top: 4px solid #2e7d32; }}
-    .name {{ font-weight: 700; margin-bottom: 6px; }}
-    .sym {{ font-size: 12px; opacity: .7; margin-bottom: 10px; }}
-    .last {{ font-size: 22px; font-weight: 800; }}
-    .chg {{ margin-top: 6px; font-weight: 700; }}
-    .up {{ color: #1b5e20; }}
-    .dn {{ color: #b00020; }}
-    .meta {{ margin-top: 18px; font-size: 12px; opacity: .7; }}
-    @media (max-width: 900px) {{ .grid {{ grid-template-columns: 1fr; }} }}
+    body{font-family:Arial, sans-serif;margin:0;background:#f7f9f8;color:#111;}
+    header{background:#1b5e20;color:#fff;padding:18px 22px;}
+    header h1{margin:0;font-size:20px;letter-spacing:.5px;}
+    header p{margin:6px 0 0;opacity:.9;}
+    .wrap{padding:18px 22px;max-width:1100px;margin:0 auto;}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+    .card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.06);border-top:4px solid #2e7d32;}
+    .name{font-weight:700;margin-bottom:6px;}
+    .sym{font-size:12px;opacity:.7;margin-bottom:10px;}
+    .last{font-size:22px;font-weight:800;}
+    .chg{margin-top:6px;font-weight:700;}
+    .up{color:#1b5e20;}
+    .dn{color:#b00020;}
+    .meta{margin-top:18px;font-size:12px;opacity:.7;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+    button{border:0;background:#2e7d32;color:#fff;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;}
+    button:disabled{opacity:.6;cursor:not-allowed;}
+    @media (max-width:900px){.grid{grid-template-columns:1fr;}}
   </style>
 </head>
 <body>
@@ -97,32 +29,177 @@ def to_html_dashboard(df: pd.DataFrame, out_file="markets_dashboard.html"):
   <h1>THEVTIG — Global Markets Dashboard</h1>
   <p>Live snapshots across US, Asia, Europe, and Crypto.</p>
 </header>
+
 <div class="wrap">
-  <div class="grid">
-"""
-    for _, r in df.iterrows():
-        cls = "up" if str(r["Change_%"]).startswith("+") else "dn"
-        html += f"""
-    <div class="card">
-      <div class="name">{r['Market']}</div>
-      <div class="sym">{r['Symbol']}</div>
-      <div class="last">{r['Last']}</div>
-      <div class="chg {cls}">{r['Change']} ({r['Change_%']})</div>
-    </div>
-"""
-    html += f"""
+  <div class="meta">
+    <button id="refreshBtn">Refresh now</button>
+    <div id="status">Loading…</div>
+    <div id="updated"></div>
   </div>
-  <div class="meta">Last updated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
+
+  <div class="grid" id="cards"></div>
+
+  <div class="meta" style="margin-top:14px;">
+    Data sources: Stooq (ETFs/indices via CSV), CoinGecko (crypto). Not investment advice.
+  </div>
 </div>
+
+<script>
+  // --- What we track (ETF proxies for regions) ---
+  const MARKETS = [
+    { group:"US",      name:"S&P 500 (SPY)",      symbol:"SPY",  source:"stooq" },
+    { group:"US",      name:"NASDAQ 100 (QQQ)",   symbol:"QQQ",  source:"stooq" },
+    { group:"US",      name:"Dow Jones (DIA)",    symbol:"DIA",  source:"stooq" },
+
+    { group:"Asia",    name:"Japan (EWJ)",        symbol:"EWJ",  source:"stooq" },
+    { group:"Asia",    name:"Hong Kong (EWH)",    symbol:"EWH",  source:"stooq" },
+
+    { group:"Europe",  name:"Euro Stoxx (FEZ)",   symbol:"FEZ",  source:"stooq" },
+    { group:"Europe",  name:"Germany (EWG)",      symbol:"EWG",  source:"stooq" },
+    { group:"Europe",  name:"UK (EWU)",           symbol:"EWU",  source:"stooq" },
+
+    { group:"Macro",   name:"Gold (GLD)",         symbol:"GLD",  source:"stooq" },
+    { group:"Macro",   name:"Oil (USO)",          symbol:"USO",  source:"stooq" },
+
+    { group:"Crypto",  name:"Bitcoin",            symbol:"bitcoin",  source:"coingecko" },
+    { group:"Crypto",  name:"Ethereum",           symbol:"ethereum", source:"coingecko" }
+  ];
+
+  const cardsEl = document.getElementById("cards");
+  const statusEl = document.getElementById("status");
+  const updatedEl = document.getElementById("updated");
+  const refreshBtn = document.getElementById("refreshBtn");
+
+  function cardHTML({name, symbol, last, change, pct, cls, group}) {
+    return `
+      <div class="card">
+        <div class="name">${name}</div>
+        <div class="sym">${group} • ${symbol}</div>
+        <div class="last">${last}</div>
+        <div class="chg ${cls}">${change} (${pct})</div>
+      </div>
+    `;
+  }
+
+  function fmtNum(x, decimals=2) {
+    const n = Number(x);
+    if (!isFinite(n)) return "—";
+    return n.toLocaleString(undefined, {minimumFractionDigits:decimals, maximumFractionDigits:decimals});
+  }
+
+  // Fetch last 2 daily closes from Stooq CSV (free, no key)
+  async function fetchStooqDaily(symbol) {
+    // Stooq uses lowercase tickers for US stocks/ETFs in many cases: spy.us
+    const stooqSym = `${symbol.toLowerCase()}.us`;
+    const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSym)}&i=d`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Stooq error for ${symbol}`);
+    const text = await res.text();
+
+    // Parse CSV: Date,Open,High,Low,Close,Volume
+    const lines = text.trim().split("\n");
+    if (lines.length < 3) throw new Error(`Not enough data for ${symbol}`);
+
+    const rows = lines.slice(1).map(l => l.split(","));
+    const closeIdx = 4;
+
+    // last 2 rows with numeric close
+    const valid = rows
+      .map(r => ({ date:r[0], close: Number(r[closeIdx]) }))
+      .filter(r => isFinite(r.close));
+
+    if (valid.length < 2) throw new Error(`No valid closes for ${symbol}`);
+
+    const last = valid[valid.length-1];
+    const prev = valid[valid.length-2];
+
+    const chg = last.close - prev.close;
+    const pct = (chg / prev.close) * 100;
+
+    return {
+      last: last.close,
+      change: chg,
+      pct: pct
+    };
+  }
+
+  // Fetch crypto from CoinGecko
+  async function fetchCoinGecko(ids) {
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids.join(","))}&vs_currencies=usd&include_24hr_change=true`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("CoinGecko error");
+    return await res.json();
+  }
+
+  async function refresh() {
+    refreshBtn.disabled = true;
+    statusEl.textContent = "Refreshing…";
+    updatedEl.textContent = "";
+
+    try {
+      cardsEl.innerHTML = "";
+
+      // 1) Crypto batch
+      const cryptoItems = MARKETS.filter(m => m.source === "coingecko");
+      const cryptoJson = await fetchCoinGecko(cryptoItems.map(x => x.symbol));
+
+      // 2) Other markets
+      const results = [];
+      for (const m of MARKETS) {
+        if (m.source === "coingecko") {
+          const obj = cryptoJson[m.symbol];
+          const last = obj?.usd;
+          const pct = obj?.usd_24h_change ?? 0;
+          const chg = last * (pct/100);
+          results.push({
+            ...m,
+            last,
+            change: chg,
+            pct
+          });
+        } else {
+          const s = await fetchStooqDaily(m.symbol);
+          results.push({
+            ...m,
+            last: s.last,
+            change: s.change,
+            pct: s.pct
+          });
+        }
+      }
+
+      // Render cards
+      for (const r of results) {
+        const cls = r.pct >= 0 ? "up" : "dn";
+        const lastStr = (r.source === "coingecko") ? `$${fmtNum(r.last, 2)}` : `$${fmtNum(r.last, 2)}`;
+        const chgStr  = `${r.change >= 0 ? "+" : ""}${fmtNum(r.change, 2)}`;
+        const pctStr  = `${r.pct >= 0 ? "+" : ""}${fmtNum(r.pct, 2)}%`;
+
+        cardsEl.insertAdjacentHTML("beforeend", cardHTML({
+          name: r.name,
+          symbol: r.source === "coingecko" ? r.symbol.toUpperCase() : r.symbol,
+          last: lastStr,
+          change: chgStr,
+          pct: pctStr,
+          cls,
+          group: r.group
+        }));
+      }
+
+      const now = new Date();
+      updatedEl.textContent = `Last updated: ${now.toLocaleString()}`;
+      statusEl.textContent = "Live snapshot loaded.";
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = "Error loading data. Try refresh.";
+    } finally {
+      refreshBtn.disabled = false;
+    }
+  }
+
+  refreshBtn.addEventListener("click", refresh);
+  refresh();
+</script>
 </body>
 </html>
-"""
-    with open(out_file, "w", encoding="utf-8") as f:
-        f.write(html)
-    print(f"Saved: {out_file}")
 
-if __name__ == "__main__":
-    df_yf = fetch_yfinance_snapshot(YF_TICKERS)
-    df_cg = fetch_coingecko_snapshot(COINGECKO)
-    df = pd.concat([df_yf, df_cg], ignore_index=True)
-    to_html_dashboard(df, out_file="markets_dashboard.html")
