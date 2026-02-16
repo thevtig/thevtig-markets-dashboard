@@ -3,171 +3,219 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>THEVTIG | BRVM Dashboard</title>
+  <title>THEVTIG | BRVM Live Ticker</title>
   <style>
     :root{
-      --bg:#f7f9f8; --panel:#fff; --text:#111; --muted:rgba(0,0,0,.65);
-      --green:#2e7d32; --deep:#1b5e20; --down:#b00020;
-      --shadow:0 6px 20px rgba(0,0,0,.06); --border:rgba(0,0,0,.06);
+      --bg:#0e1510;
+      --panel:#121b14;
+      --text:#eef6ef;
+      --muted:rgba(238,246,239,.72);
+      --green:#2e7d32;
+      --deep:#1b5e20;
+      --down:#ff5a6b;
+      --up:#7dff9c;
+      --neu:#cbd5cb;
+      --border:rgba(255,255,255,.10);
     }
-    body{font-family:Arial, sans-serif;margin:0;background:var(--bg);color:var(--text);}
-    header{background:var(--deep);color:#fff;padding:18px 22px;}
-    header h1{margin:0;font-size:20px;letter-spacing:.5px;}
-    header p{margin:6px 0 0;opacity:.9;}
-    .wrap{padding:18px 22px;max-width:1100px;margin:0 auto;}
-    .meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:12px;}
-    button{border:0;background:var(--green);color:#fff;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700;}
-    button:disabled{opacity:.6;cursor:not-allowed;}
-    .grid{margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
-    .card{background:var(--panel);border-radius:14px;padding:14px;box-shadow:var(--shadow);border:1px solid var(--border);border-top:4px solid var(--green);}
-    .name{font-weight:900;margin-bottom:6px;}
-    .val{font-size:22px;font-weight:900;}
-    .chg{margin-top:6px;font-weight:800;}
-    .up{color:var(--green);} .dn{color:var(--down);}
-    .small{margin-top:6px;font-size:12px;opacity:.75;}
-    a{color:var(--green);font-weight:700;text-decoration:none;}
-    @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+    body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text);}
+    header{background:var(--deep);padding:14px 18px;}
+    header h1{margin:0;font-size:16px;letter-spacing:.4px;}
+    header p{margin:6px 0 0;font-size:12px;color:rgba(255,255,255,.85)}
+    .wrap{max-width:1200px;margin:0 auto;padding:14px 18px;}
+
+    .bar{
+      background: linear-gradient(90deg, rgba(46,125,50,.28), rgba(18,27,20,.35));
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      position:relative;
+    }
+
+    .barTop{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px 12px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    button{
+      border:0;background:var(--green);color:white;
+      padding:8px 10px;border-radius:10px;cursor:pointer;font-weight:700;
+    }
+    button:disabled{opacity:.65;cursor:not-allowed;}
+
+    /* Rolling ticker */
+    .tickerViewport{
+      width:100%;
+      overflow:hidden;
+      white-space:nowrap;
+    }
+    .tickerTrack{
+      display:inline-flex;
+      gap:14px;
+      padding:12px;
+      align-items:center;
+      will-change: transform;
+      animation: scroll 45s linear infinite;
+    }
+    .tickerItem{
+      display:inline-flex;
+      gap:10px;
+      align-items:center;
+      padding:8px 10px;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:999px;
+      background: rgba(0,0,0,.12);
+      font-size:13px;
+    }
+    .code{font-weight:900;letter-spacing:.3px;}
+    .price{color:rgba(255,255,255,.92); font-weight:800;}
+    .pct{font-weight:900;}
+    .up{color:var(--up);}
+    .dn{color:var(--down);}
+    .nul{color:var(--neu);}
+
+    /* Pause on hover (nice UX) */
+    .bar:hover .tickerTrack{ animation-play-state: paused; }
+
+    @keyframes scroll{
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
+    .note{margin-top:10px;color:var(--muted);font-size:12px;}
+    a{color:var(--up);text-decoration:none;font-weight:800;}
   </style>
 </head>
 
 <body>
 <header>
-  <h1>THEVTIG — BRVM Dashboard</h1>
-  <p>Live BRVM headline indices & market capitalization (public feed).</p>
+  <h1>THEVTIG — BRVM Live Ticker</h1>
+  <p>Rolling BRVM quotes (public webpage extraction). Not investment advice.</p>
 </header>
 
 <div class="wrap">
-  <div class="meta">
-    <button id="refreshBtn">Refresh now</button>
-    <div id="status">Loading…</div>
-    <div id="updated"></div>
-    <div>Source: <a href="https://www.brvm.org/en/real-time-data-feed" target="_blank" rel="noreferrer">BRVM Real-time Data Feed</a></div>
+  <div class="bar">
+    <div class="barTop">
+      <div>
+        <strong>Status:</strong> <span id="status">Loading…</span>
+        &nbsp;•&nbsp;
+        <strong>Updated:</strong> <span id="updated">—</span>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button id="refreshBtn">Refresh</button>
+      </div>
+    </div>
+
+    <div class="tickerViewport">
+      <div class="tickerTrack" id="track">
+        <!-- items injected -->
+      </div>
+    </div>
   </div>
 
-  <div class="grid" id="cards"></div>
-
-  <div class="meta" style="margin-top:14px;">
-    Note: Values shown depend on what BRVM publishes on the public page and may be delayed. Not investment advice.
+  <div class="note">
+    Source: <a href="https://www.brvm.org/" target="_blank" rel="noreferrer">brvm.org</a>.
+    If BRVM changes its HTML structure, this tape may need an update.
   </div>
 </div>
 
 <script>
-  const refreshBtn = document.getElementById("refreshBtn");
-  const statusEl = document.getElementById("status");
+  const statusEl  = document.getElementById("status");
   const updatedEl = document.getElementById("updated");
-  const cardsEl = document.getElementById("cards");
+  const refreshBtn= document.getElementById("refreshBtn");
+  const trackEl   = document.getElementById("track");
 
-  const SOURCE_URL = "https://www.brvm.org/en/real-time-data-feed";
-  // CORS-safe proxy for GitHub Pages
-  const PROXY_URL = (u) => `https://r.jina.ai/http://r.jina.ai/${u}`;
+  const SOURCE = "https://www.brvm.org/";
+  const PROXY  = (u) => `https://r.jina.ai/http://r.jina.ai/${u}`;
 
-  function numFromText(s){
-    // handle "391,57" and "15 097 441 307 857"
-    if (!s) return NaN;
-    const cleaned = s.replace(/\s+/g," ").trim();
-    // if it has comma decimal, convert
-    // keep digits, spaces, commas, dots
-    const keep = cleaned.replace(/[^\d\s,.-]/g,"").trim();
-    // remove spaces (thousands separators)
-    const noSpaces = keep.replace(/\s+/g,"");
-    // if comma used as decimal: replace last comma with dot if no dot exists
-    if (noSpaces.includes(",") && !noSpaces.includes(".")) {
-      return Number(noSpaces.replace(",", "."));
+  function classifyPct(pctText){
+    // pctText examples: "-0,10%" "0,28%" "0,00%"
+    const t = (pctText || "").replace("%","").replace(",",".").trim();
+    const v = Number(t);
+    if (!isFinite(v)) return "nul";
+    if (v > 0) return "up";
+    if (v < 0) return "dn";
+    return "nul";
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[m]));
+  }
+
+  function buildItem(code, price, pct){
+    const cls = classifyPct(pct);
+    return `
+      <div class="tickerItem">
+        <span class="code">${escapeHtml(code)}</span>
+        <span class="price">${escapeHtml(price)}</span>
+        <span class="pct ${cls}">${escapeHtml(pct)}</span>
+      </div>
+    `;
+  }
+
+  async function fetchBRVMTape(){
+    const res = await fetch(PROXY(SOURCE), { cache: "no-store" });
+    if (!res.ok) throw new Error("BRVM fetch failed");
+    const html = await res.text();
+
+    // Parse HTML
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    // BRVM uses owl-carousel items; each item has spans:
+    // <div class="item"><span>CODE</span> <span>PRICE</span> <span>%</span> ...</div>
+    const items = [...doc.querySelectorAll("#slide-seance .item")];
+
+    // If selector changes, try fallback:
+    const useItems = items.length ? items : [...doc.querySelectorAll(".owl-carousel .item")];
+
+    const rows = [];
+    for (const it of useItems){
+      const spans = [...it.querySelectorAll("span")].map(s => s.textContent.trim()).filter(Boolean);
+      if (spans.length >= 3){
+        rows.push({ code: spans[0], price: spans[1], pct: spans[2] });
+      }
     }
-    // else strip commas
-    return Number(noSpaces.replace(/,/g,""));
+    return rows;
   }
 
-  function fmt(x){
-    if (!isFinite(x)) return "—";
-    return x.toLocaleString(undefined, {maximumFractionDigits: 2});
-  }
+  function renderTape(rows){
+    if (!rows.length){
+      trackEl.innerHTML = `<div style="padding:12px;color:rgba(255,255,255,.85)">No ticker items found on BRVM page.</div>`;
+      return;
+    }
 
-  function card(name, value, chgPct){
-    const cls = (isFinite(chgPct) && chgPct < 0) ? "dn" : "up";
-    const chgStr = isFinite(chgPct) ? `${chgPct >= 0 ? "+" : ""}${fmt(chgPct)}%` : "—";
-    return `
-      <div class="card">
-        <div class="name">${name}</div>
-        <div class="val">${value}</div>
-        <div class="chg ${cls}">${chgStr}</div>
-      </div>
-    `;
-  }
+    // Build once…
+    const chunk = rows.map(r => buildItem(r.code, r.price, r.pct)).join("");
 
-  function simpleCard(name, value, suffix=""){
-    return `
-      <div class="card">
-        <div class="name">${name}</div>
-        <div class="val">${value}${suffix}</div>
-        <div class="small">Latest public snapshot</div>
-      </div>
-    `;
-  }
+    // Duplicate the chunk so animation can loop smoothly
+    // (track moves -50% in CSS)
+    trackEl.innerHTML = chunk + chunk;
 
-  function extractMetric(text, label){
-    // Try to capture patterns like: "BRVM-C · 391,57, 0,99%"
-    const re = new RegExp(`${label}\\s*·\\s*([\\d\\s.,-]+)\\s*,\\s*([\\d\\s.,-]+)%`, "i");
-    const m = text.match(re);
-    if (!m) return null;
-    return { level: numFromText(m[1]), pct: numFromText(m[2]) };
-  }
-
-  function extractCap(text, label){
-    // French/English variations exist; do best-effort
-    // examples: "Equities Capitalization, 14 949 311 280 468 FCFA"
-    const re = new RegExp(`${label}[^\\d]{0,40}([\\d\\s.,]+)\\s*(FCFA|XOF)?`, "i");
-    const m = text.match(re);
-    if (!m) return null;
-    const n = numFromText(m[1]);
-    return isFinite(n) ? n : null;
+    // Adjust speed automatically: more items => longer scroll
+    const seconds = Math.min(90, Math.max(35, rows.length * 2));
+    trackEl.style.animationDuration = `${seconds}s`;
   }
 
   async function refresh(){
     refreshBtn.disabled = true;
     statusEl.textContent = "Refreshing…";
-    updatedEl.textContent = "";
 
     try{
-      const res = await fetch(PROXY_URL(SOURCE_URL), { cache: "no-store" });
-      if (!res.ok) throw new Error("BRVM fetch failed");
-      const txt = await res.text();
+      const rows = await fetchBRVMTape();
+      renderTape(rows);
 
-      // Indices
-      const brvmc = extractMetric(txt, "BRVM-C");
-      const brvm30 = extractMetric(txt, "BRVM-30");
-      const brvmpres = extractMetric(txt, "BRVM-PRES");
-
-      // Market caps (best-effort; wording varies by language)
-      const eqCap = extractCap(txt, "Equities Capitalization") ?? extractCap(txt, "Capitalisation Actions");
-      const bdCap = extractCap(txt, "Bonds Capitalization") ?? extractCap(txt, "Capitalisation des obligations");
-
-      cardsEl.innerHTML = "";
-
-      if (brvmc) cardsEl.insertAdjacentHTML("beforeend", card("BRVM Composite (BRVM-C)", fmt(brvmc.level), brvmc.pct));
-      if (brvm30) cardsEl.insertAdjacentHTML("beforeend", card("BRVM 30", fmt(brvm30.level), brvm30.pct));
-      if (brvmpres) cardsEl.insertAdjacentHTML("beforeend", card("BRVM Prestige", fmt(brvmpres.level), brvmpres.pct));
-
-      if (eqCap) cardsEl.insertAdjacentHTML("beforeend", simpleCard("Equities Market Cap", fmt(eqCap), " XOF"));
-      if (bdCap) cardsEl.insertAdjacentHTML("beforeend", simpleCard("Bonds Market Cap", fmt(bdCap), " XOF"));
-
-      // Fallback message if parsing fails
-      if (!brvmc && !brvm30 && !brvmpres && !eqCap && !bdCap){
-        cardsEl.innerHTML = `
-          <div class="card" style="grid-column:1/-1">
-            <div class="name">BRVM Data</div>
-            <div class="small">Could not parse the public page structure today. The source format may have changed.</div>
-            <div class="small">You can still open the source: <a href="${SOURCE_URL}" target="_blank" rel="noreferrer">${SOURCE_URL}</a></div>
-          </div>
-        `;
-      }
-
-      const now = new Date();
-      updatedEl.textContent = `Last updated: ${now.toLocaleString()}`;
-      statusEl.textContent = "Live snapshot loaded.";
-    } catch(e){
+      statusEl.textContent = "Live tape loaded.";
+      updatedEl.textContent = new Date().toLocaleString();
+    } catch (e){
       console.error(e);
-      statusEl.textContent = "Error loading BRVM data. Try refresh.";
+      statusEl.textContent = "Error loading BRVM tape. Try again.";
     } finally {
       refreshBtn.disabled = false;
     }
@@ -176,8 +224,8 @@
   refreshBtn.addEventListener("click", refresh);
   refresh();
 
-  // Auto refresh every 15 minutes
-  setInterval(refresh, 900000);
+  // Auto refresh every 30 minutes (safer for public scraping)
+  setInterval(refresh, 1800000);
 </script>
 </body>
 </html>
