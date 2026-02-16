@@ -4,197 +4,486 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>THEVTIG | Global Markets Dashboard</title>
+
   <style>
-    body{font-family:Arial, sans-serif;margin:0;background:#f7f9f8;color:#111;}
-    header{background:#1b5e20;color:#fff;padding:18px 22px;}
+    :root{
+      --bg: #f7f9f8;
+      --panel:#ffffff;
+      --text:#111;
+      --muted: rgba(0,0,0,.65);
+      --shadow: 0 6px 20px rgba(0,0,0,.06);
+      --green:#2e7d32;
+      --deep:#1b5e20;
+      --down:#b00020;
+      --border: rgba(0,0,0,.06);
+      --spark: rgba(46,125,50,.9);
+      --sparkFill: rgba(46,125,50,.10);
+    }
+
+    /* Dark mode */
+    body.dark{
+      --bg: #0e1510;
+      --panel:#121b14;
+      --text:#eef6ef;
+      --muted: rgba(238,246,239,.68);
+      --shadow: 0 10px 26px rgba(0,0,0,.35);
+      --border: rgba(255,255,255,.07);
+      --spark: rgba(117,255,156,.95);
+      --sparkFill: rgba(117,255,156,.10);
+    }
+
+    body{
+      font-family: Arial, sans-serif;
+      margin:0;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header{
+      background: var(--deep);
+      color:#fff;
+      padding:18px 22px;
+      position: sticky;
+      top:0;
+      z-index: 5;
+    }
+
     header h1{margin:0;font-size:20px;letter-spacing:.5px;}
     header p{margin:6px 0 0;opacity:.9;}
+
     .wrap{padding:18px 22px;max-width:1100px;margin:0 auto;}
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
-    .card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.06);border-top:4px solid #2e7d32;}
-    .name{font-weight:700;margin-bottom:6px;}
-    .sym{font-size:12px;opacity:.7;margin-bottom:10px;}
-    .last{font-size:22px;font-weight:800;}
-    .chg{margin-top:6px;font-weight:700;}
-    .up{color:#1b5e20;}
-    .dn{color:#b00020;}
-    .meta{margin-top:18px;font-size:12px;opacity:.7;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
-    button{border:0;background:#2e7d32;color:#fff;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;}
+
+    .topbar{
+      margin-top: 10px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .pill{
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 999px;
+      padding: 8px 10px;
+      font-size: 12px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+
+    .meta{
+      margin-top:18px;
+      font-size:12px;
+      opacity:.9;
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+      color: var(--muted);
+    }
+
+    button{
+      border:0;
+      background: var(--green);
+      color:#fff;
+      padding:10px 12px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:700;
+    }
+    button.secondary{
+      background: transparent;
+      border: 1px solid rgba(255,255,255,.35);
+      color:#fff;
+    }
     button:disabled{opacity:.6;cursor:not-allowed;}
-    @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+
+    .section{
+      margin-top: 18px;
+    }
+    .section h2{
+      margin: 0 0 10px;
+      font-size: 14px;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:14px;
+    }
+
+    .card{
+      background: var(--panel);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+      border-top: 4px solid var(--green);
+      border: 1px solid var(--border);
+    }
+
+    .name{font-weight:800;margin-bottom:6px;}
+    .sym{font-size:12px;opacity:.7;margin-bottom:10px;color: var(--muted);}
+    .row{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:10px;
+    }
+    .last{font-size:22px;font-weight:900;}
+    .chg{margin-top:6px;font-weight:800;}
+    .up{color: var(--green);}
+    .dn{color: var(--down);}
+
+    .spark{
+      width: 120px;
+      height: 34px;
+      opacity: .95;
+    }
+
+    .note{
+      margin-top:14px;
+      font-size:12px;
+      opacity:.8;
+      color: var(--muted);
+    }
+
+    @media (max-width:900px){
+      .grid{grid-template-columns:1fr;}
+      .spark{width: 140px;}
+    }
   </style>
 </head>
+
 <body>
 <header>
   <h1>THEVTIG — Global Markets Dashboard</h1>
-  <p>Live snapshots across US, Asia, Europe, and Crypto.</p>
+  <p>Live snapshots across US, Asia, Europe, Africa, and Crypto.</p>
+
+  <div class="topbar">
+    <button id="refreshBtn">Refresh now</button>
+    <button id="themeBtn" class="secondary" title="Toggle dark mode">Toggle theme</button>
+
+    <div class="pill">
+      <strong>Status:</strong> <span id="status">Loading…</span>
+    </div>
+    <div class="pill">
+      <strong>Next refresh:</strong> <span id="countdown">—</span>
+    </div>
+    <div class="pill">
+      <strong>Updated:</strong> <span id="updated">—</span>
+    </div>
+  </div>
 </header>
 
 <div class="wrap">
-  <div class="meta">
-    <button id="refreshBtn">Refresh now</button>
-    <div id="status">Loading…</div>
-    <div id="updated"></div>
-  </div>
+  <div id="content"></div>
 
-  <div class="grid" id="cards"></div>
-
-  <div class="meta" style="margin-top:14px;">
-    Data sources: Stooq (ETFs/indices via CSV), CoinGecko (crypto). Not investment advice.
+  <div class="note">
+    Data sources: Stooq (daily ETF/market proxies via CSV), CoinGecko (crypto). Africa: NGX/JSE shown via liquid ETF proxies (NGE/EZA). BRVM placeholder until a public data feed is connected. Not investment advice.
   </div>
 </div>
 
 <script>
-  // --- What we track (ETF proxies for regions) ---
+  // =========================
+  // 1) What we track
+  // =========================
+  // Stooq uses .us tickers for many US-listed ETFs; these are proxies for regions:
+  // - NGX proxy: NGE (Global X MSCI Nigeria ETF)
+  // - JSE proxy: EZA (iShares MSCI South Africa ETF)
+  // BRVM: placeholder until you choose a feed.
   const MARKETS = [
-    { group:"US",      name:"S&P 500 (SPY)",      symbol:"SPY",  source:"stooq" },
-    { group:"US",      name:"NASDAQ 100 (QQQ)",   symbol:"QQQ",  source:"stooq" },
-    { group:"US",      name:"Dow Jones (DIA)",    symbol:"DIA",  source:"stooq" },
+    // US
+    { group:"US Markets",   name:"S&P 500",          symbol:"SPY",  source:"stooq" },
+    { group:"US Markets",   name:"NASDAQ 100",       symbol:"QQQ",  source:"stooq" },
+    { group:"US Markets",   name:"Dow Jones",        symbol:"DIA",  source:"stooq" },
 
-    { group:"Asia",    name:"Japan (EWJ)",        symbol:"EWJ",  source:"stooq" },
-    { group:"Asia",    name:"Hong Kong (EWH)",    symbol:"EWH",  source:"stooq" },
+    // Asia (proxies)
+    { group:"Asian Markets", name:"Japan",           symbol:"EWJ",  source:"stooq" },
+    { group:"Asian Markets", name:"Hong Kong",       symbol:"EWH",  source:"stooq" },
 
-    { group:"Europe",  name:"Euro Stoxx (FEZ)",   symbol:"FEZ",  source:"stooq" },
-    { group:"Europe",  name:"Germany (EWG)",      symbol:"EWG",  source:"stooq" },
-    { group:"Europe",  name:"UK (EWU)",           symbol:"EWU",  source:"stooq" },
+    // Europe (proxies)
+    { group:"European Markets", name:"Euro Zone",    symbol:"FEZ",  source:"stooq" },
+    { group:"European Markets", name:"Germany",      symbol:"EWG",  source:"stooq" },
+    { group:"European Markets", name:"United Kingdom",symbol:"EWU", source:"stooq" },
 
-    { group:"Macro",   name:"Gold (GLD)",         symbol:"GLD",  source:"stooq" },
-    { group:"Macro",   name:"Oil (USO)",          symbol:"USO",  source:"stooq" },
+    // Africa (proxies + placeholder)
+    { group:"African Markets", name:"Nigeria (NGX proxy)", symbol:"NGE", source:"stooq" },
+    { group:"African Markets", name:"South Africa (JSE proxy)", symbol:"EZA", source:"stooq" },
+    { group:"African Markets", name:"BRVM (placeholder)", symbol:"BRVM", source:"manual" },
 
-    { group:"Crypto",  name:"Bitcoin",            symbol:"bitcoin",  source:"coingecko" },
-    { group:"Crypto",  name:"Ethereum",           symbol:"ethereum", source:"coingecko" }
+    // Macro proxies
+    { group:"Macro",        name:"Gold",             symbol:"GLD",  source:"stooq" },
+    { group:"Macro",        name:"Oil (WTI proxy)",  symbol:"USO",  source:"stooq" },
+
+    // Crypto
+    { group:"Crypto",       name:"Bitcoin",          symbol:"bitcoin",  source:"coingecko" },
+    { group:"Crypto",       name:"Ethereum",         symbol:"ethereum", source:"coingecko" }
   ];
 
-  const cardsEl = document.getElementById("cards");
+  // =========================
+  // 2) DOM elements
+  // =========================
   const statusEl = document.getElementById("status");
   const updatedEl = document.getElementById("updated");
+  const countdownEl = document.getElementById("countdown");
   const refreshBtn = document.getElementById("refreshBtn");
+  const themeBtn = document.getElementById("themeBtn");
+  const contentEl = document.getElementById("content");
 
-  function cardHTML({name, symbol, last, change, pct, cls, group}) {
-    return `
-      <div class="card">
-        <div class="name">${name}</div>
-        <div class="sym">${group} • ${symbol}</div>
-        <div class="last">${last}</div>
-        <div class="chg ${cls}">${change} (${pct})</div>
-      </div>
-    `;
+  // =========================
+  // 3) Theme toggle
+  // =========================
+  function applyThemeFromStorage(){
+    const saved = localStorage.getItem("thevtig_theme");
+    if (saved === "dark") document.body.classList.add("dark");
+    if (saved === "light") document.body.classList.remove("dark");
+    if (!saved){
+      // auto-detect
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches){
+        document.body.classList.add("dark");
+      }
+    }
   }
+  applyThemeFromStorage();
 
+  themeBtn.addEventListener("click", () => {
+    const isDark = document.body.classList.toggle("dark");
+    localStorage.setItem("thevtig_theme", isDark ? "dark" : "light");
+  });
+
+  // =========================
+  // 4) Helpers
+  // =========================
   function fmtNum(x, decimals=2) {
     const n = Number(x);
     if (!isFinite(n)) return "—";
     return n.toLocaleString(undefined, {minimumFractionDigits:decimals, maximumFractionDigits:decimals});
   }
 
-  // Fetch last 2 daily closes from Stooq CSV (free, no key)
- async function fetchStooqDaily(symbol) {
-  // Use a CORS-friendly proxy for Stooq (GitHub Pages often blocks direct Stooq requests)
-  const stooqSym = `${symbol.toLowerCase()}.us`;
-  const rawUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSym)}&i=d`;
+  function makeSparkSVG(series){
+    // series: array of numbers
+    if (!series || series.length < 5) return "";
+    const w = 120, h = 34, pad = 2;
 
-  // Jina AI proxy returns the page content with permissive CORS headers
- const url = `https://r.jina.ai/http://r.jina.ai/${rawUrl}`;
+    const min = Math.min(...series);
+    const max = Math.max(...series);
+    const rng = (max - min) || 1;
 
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Stooq proxy error for ${symbol}`);
+    const pts = series.map((v,i) => {
+      const x = pad + (i * (w - pad*2)) / (series.length - 1);
+      const y = pad + (h - pad*2) * (1 - (v - min)/rng);
+      return [x,y];
+    });
 
-  const text = await res.text();
+    const d = pts.map((p,i)=> (i===0?`M ${p[0]} ${p[1]}`:`L ${p[0]} ${p[1]}`)).join(" ");
 
-  // Extract the CSV lines from the proxy response
-  // We keep only lines that look like CSV rows: YYYY-MM-DD,...
-  const csvLines = text
-  .split("\n")
-  .map(l => l.trim())
-  .filter(l => l.includes(",") && /^\d{4}-\d{2}-\d{2}/.test(l));
+    // Area fill
+    const area = `${d} L ${pts[pts.length-1][0]} ${h-pad} L ${pts[0][0]} ${h-pad} Z`;
 
-  if (csvLines.length < 2) throw new Error(`Not enough CSV data for ${symbol}`);
+    return `
+      <svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+        <path d="${area}" fill="var(--sparkFill)"></path>
+        <path d="${d}" fill="none" stroke="var(--spark)" stroke-width="2" stroke-linecap="round"></path>
+      </svg>
+    `;
+  }
 
-  // Parse rows: Date,Open,High,Low,Close,Volume
-  const rows = csvLines.map(l => l.split(","));
-  const closeIdx = 4;
+  function cardHTML({group, name, symbol, lastStr, chgStr, pctStr, cls, spark}) {
+    return `
+      <div class="card">
+        <div class="name">${name}</div>
+        <div class="sym">${group} • ${symbol}</div>
+        <div class="row">
+          <div>
+            <div class="last">${lastStr}</div>
+            <div class="chg ${cls}">${chgStr} (${pctStr})</div>
+          </div>
+          ${spark || ""}
+        </div>
+      </div>
+    `;
+  }
 
-  const valid = rows
-    .map(r => ({ date: r[0], close: Number(r[closeIdx]) }))
-    .filter(r => Number.isFinite(r.close));
+  // =========================
+  // 5) Data fetchers
+  // =========================
+  async function fetchStooqSeries(symbol, points=30){
+    // Double-proxy for stable CORS on GitHub Pages
+    const stooqSym = `${symbol.toLowerCase()}.us`;
+    const rawUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSym)}&i=d`;
+    const url = `https://r.jina.ai/http://r.jina.ai/${rawUrl}`;
 
-  if (valid.length < 2) throw new Error(`No valid closes for ${symbol}`);
-
-  const last = valid[valid.length - 1];
-  const prev = valid[valid.length - 2];
-
-  const chg = last.close - prev.close;
-  const pct = (chg / prev.close) * 100;
-
-  return { last: last.close, change: chg, pct: pct };
-}
-
-
-  // Fetch crypto from CoinGecko
-  async function fetchCoinGecko(ids) {
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids.join(","))}&vs_currencies=usd&include_24hr_change=true`;
     const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Stooq proxy error for ${symbol}`);
+
+    const text = await res.text();
+    const csvLines = text
+      .split("\n")
+      .map(l => l.trim())
+      .filter(l => l.includes(",") && /^\d{4}-\d{2}-\d{2}/.test(l));
+
+    if (csvLines.length < 5) throw new Error(`Not enough CSV data for ${symbol}`);
+
+    // Date,Open,High,Low,Close,Volume
+    const rows = csvLines.map(l => l.split(","));
+    const closeIdx = 4;
+
+    const closes = rows
+      .map(r => Number(r[closeIdx]))
+      .filter(v => Number.isFinite(v));
+
+    if (closes.length < 5) throw new Error(`No valid closes for ${symbol}`);
+
+    const series = closes.slice(-points);
+    const last = series[series.length-1];
+    const prev = series[series.length-2];
+    const chg = last - prev;
+    const pct = (chg / prev) * 100;
+
+    return { last, chg, pct, series };
+  }
+
+  async function fetchCoinGecko(ids){
+    // simple price + 24h change
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids.join(","))}&vs_currencies=usd&include_24hr_change=true`;
+    const res = await fetch(url, { cache:"no-store" });
     if (!res.ok) throw new Error("CoinGecko error");
     return await res.json();
   }
 
-  async function refresh() {
-    refreshBtn.disabled = true;
-    statusEl.textContent = "Refreshing…";
-    updatedEl.textContent = "";
+  // =========================
+  // 6) Rendering & refresh logic
+  // =========================
+  let nextRefreshAt = null;
+  let countdownTimer = null;
 
-    try {
-      cardsEl.innerHTML = "";
+  function startCountdown(intervalMs){
+    nextRefreshAt = Date.now() + intervalMs;
+    if (countdownTimer) clearInterval(countdownTimer);
 
-      // 1) Crypto batch
-      const cryptoItems = MARKETS.filter(m => m.source === "coingecko");
-      const cryptoJson = await fetchCoinGecko(cryptoItems.map(x => x.symbol));
+    const tick = () => {
+      if (!nextRefreshAt) { countdownEl.textContent = "—"; return; }
+      const remain = Math.max(0, nextRefreshAt - Date.now());
+      const s = Math.floor(remain/1000);
+      const mm = String(Math.floor(s/60)).padStart(2,"0");
+      const ss = String(s%60).padStart(2,"0");
+      countdownEl.textContent = `${mm}:${ss}`;
+    };
 
-      // 2) Other markets
-      const results = [];
-      for (const m of MARKETS) {
-        if (m.source === "coingecko") {
-          const obj = cryptoJson[m.symbol];
-          const last = obj?.usd;
-          const pct = obj?.usd_24h_change ?? 0;
-          const chg = last * (pct/100);
-          results.push({
-            ...m,
-            last,
-            change: chg,
-            pct
-          });
-        }} else {
-  try {
-    const s = await fetchStooqDaily(m.symbol);
-    results.push({ ...m, last: s.last, change: s.change, pct: s.pct });
-  } catch (err) {
-    // still render card but show unavailable
-    results.push({ ...m, last: NaN, change: NaN, pct: NaN });
+    tick();
+    countdownTimer = setInterval(tick, 1000);
   }
-}
-      // Render cards
-      for (const r of results) {
-        const cls = r.pct >= 0 ? "up" : "dn";
-        const lastStr = (r.source === "coingecko") ? `$${fmtNum(r.last, 2)}` : `$${fmtNum(r.last, 2)}`;
-        const chgStr  = `${r.change >= 0 ? "+" : ""}${fmtNum(r.change, 2)}`;
-        const pctStr  = `${r.pct >= 0 ? "+" : ""}${fmtNum(r.pct, 2)}%`;
 
-        cardsEl.insertAdjacentHTML("beforeend", cardHTML({
+  function groupBy(arr, key){
+    const map = new Map();
+    for (const item of arr){
+      const k = item[key] || "Other";
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(item);
+    }
+    return map;
+  }
+
+  function render(results){
+    contentEl.innerHTML = "";
+
+    const grouped = groupBy(results, "group");
+    for (const [groupName, items] of grouped.entries()){
+      const section = document.createElement("div");
+      section.className = "section";
+
+      const h2 = document.createElement("h2");
+      h2.textContent = groupName;
+      section.appendChild(h2);
+
+      const grid = document.createElement("div");
+      grid.className = "grid";
+
+      for (const r of items){
+        const cls = (r.pct >= 0) ? "up" : "dn";
+        const lastStr = isFinite(r.last) ? `$${fmtNum(r.last, 2)}` : "—";
+        const chgStr  = isFinite(r.chg) ? `${r.chg >= 0 ? "+" : ""}${fmtNum(r.chg, 2)}` : "—";
+        const pctStr  = isFinite(r.pct) ? `${r.pct >= 0 ? "+" : ""}${fmtNum(r.pct, 2)}%` : "—";
+        const spark = (r.series && r.series.length >= 5) ? makeSparkSVG(r.series) : "";
+
+        grid.insertAdjacentHTML("beforeend", cardHTML({
+          group: r.group,
           name: r.name,
-          symbol: r.source === "coingecko" ? r.symbol.toUpperCase() : r.symbol,
-          last: lastStr,
-          change: chgStr,
-          pct: pctStr,
+          symbol: r.displaySymbol || r.symbol,
+          lastStr, chgStr, pctStr,
           cls,
-          group: r.group
+          spark
         }));
       }
 
+      section.appendChild(grid);
+      contentEl.appendChild(section);
+    }
+  }
+
+  async function refresh(){
+    refreshBtn.disabled = true;
+    statusEl.textContent = "Refreshing…";
+
+    try{
+      // Crypto batch
+      const cryptoItems = MARKETS.filter(m => m.source === "coingecko");
+      const cryptoJson = await fetchCoinGecko(cryptoItems.map(x => x.symbol));
+
+      const results = [];
+      for (const m of MARKETS){
+        if (m.source === "coingecko"){
+          const obj = cryptoJson[m.symbol];
+          const last = Number(obj?.usd);
+          const pct = Number(obj?.usd_24h_change ?? NaN);
+          const chg = isFinite(last) && isFinite(pct) ? last * (pct/100) : NaN;
+
+          results.push({
+            ...m,
+            last, chg, pct,
+            series: null,
+            displaySymbol: m.symbol.toUpperCase()
+          });
+        }
+        else if (m.source === "manual"){
+          results.push({
+            ...m,
+            last: NaN, chg: NaN, pct: NaN,
+            series: null,
+            displaySymbol: m.symbol
+          });
+        }
+        else {
+          // Stooq series + sparkline
+          try{
+            const s = await fetchStooqSeries(m.symbol, 30);
+            results.push({
+              ...m,
+              last: s.last, chg: s.chg, pct: s.pct,
+              series: s.series,
+              displaySymbol: m.symbol
+            });
+          } catch (err){
+            results.push({
+              ...m,
+              last: NaN, chg: NaN, pct: NaN,
+              series: null,
+              displaySymbol: m.symbol
+            });
+          }
+        }
+      }
+
+      render(results);
+
       const now = new Date();
-      updatedEl.textContent = `Last updated: ${now.toLocaleString()}`;
+      updatedEl.textContent = now.toLocaleString();
       statusEl.textContent = "Live snapshot loaded.";
-    } catch (e) {
+    } catch(e){
       console.error(e);
       statusEl.textContent = "Error loading data. Try refresh.";
     } finally {
@@ -203,21 +492,24 @@
   }
 
   refreshBtn.addEventListener("click", refresh);
-refresh();
 
-// Smart auto refresh (only during market hours)
-setInterval(() => {
-  const now = new Date();
-  const hour = now.getHours();
+  // =========================
+  // 7) Auto refresh + countdown
+  // =========================
+  // Recommended: 15 minutes
+  const REFRESH_MS = 900000;
 
-  // Only refresh between 8 AM and 6 PM
-  if (hour >= 8 && hour <= 18) {
+  // Load immediately
+  refresh();
+
+  // Countdown starts immediately
+  startCountdown(REFRESH_MS);
+
+  // Refresh every 15 minutes + reset countdown
+  setInterval(() => {
     refresh();
-  }
-}, 900000); // 15 minutes
-
-
+    startCountdown(REFRESH_MS);
+  }, REFRESH_MS);
 </script>
 </body>
 </html>
-
