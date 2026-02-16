@@ -88,40 +88,47 @@
   }
 
   // Fetch last 2 daily closes from Stooq CSV (free, no key)
-  async function fetchStooqDaily(symbol) {
-    // Stooq uses lowercase tickers for US stocks/ETFs in many cases: spy.us
-    const stooqSym = `${symbol.toLowerCase()}.us`;
-    const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSym)}&i=d`;
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Stooq error for ${symbol}`);
-    const text = await res.text();
+ async function fetchStooqDaily(symbol) {
+  // Use a CORS-friendly proxy for Stooq (GitHub Pages often blocks direct Stooq requests)
+  const stooqSym = `${symbol.toLowerCase()}.us`;
+  const rawUrl = `http://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSym)}&i=d`;
 
-    // Parse CSV: Date,Open,High,Low,Close,Volume
-    const lines = text.trim().split("\n");
-    if (lines.length < 3) throw new Error(`Not enough data for ${symbol}`);
+  // Jina AI proxy returns the page content with permissive CORS headers
+  const url = `https://r.jina.ai/${rawUrl}`;
 
-    const rows = lines.slice(1).map(l => l.split(","));
-    const closeIdx = 4;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Stooq proxy error for ${symbol}`);
 
-    // last 2 rows with numeric close
-    const valid = rows
-      .map(r => ({ date:r[0], close: Number(r[closeIdx]) }))
-      .filter(r => isFinite(r.close));
+  const text = await res.text();
 
-    if (valid.length < 2) throw new Error(`No valid closes for ${symbol}`);
+  // Extract the CSV lines from the proxy response
+  // We keep only lines that look like CSV rows: YYYY-MM-DD,...
+  const csvLines = text
+    .split("\n")
+    .map(l => l.trim())
+    .filter(l => /^\d{4}-\d{2}-\d{2},/.test(l));
 
-    const last = valid[valid.length-1];
-    const prev = valid[valid.length-2];
+  if (csvLines.length < 2) throw new Error(`Not enough CSV data for ${symbol}`);
 
-    const chg = last.close - prev.close;
-    const pct = (chg / prev.close) * 100;
+  // Parse rows: Date,Open,High,Low,Close,Volume
+  const rows = csvLines.map(l => l.split(","));
+  const closeIdx = 4;
 
-    return {
-      last: last.close,
-      change: chg,
-      pct: pct
-    };
-  }
+  const valid = rows
+    .map(r => ({ date: r[0], close: Number(r[closeIdx]) }))
+    .filter(r => Number.isFinite(r.close));
+
+  if (valid.length < 2) throw new Error(`No valid closes for ${symbol}`);
+
+  const last = valid[valid.length - 1];
+  const prev = valid[valid.length - 2];
+
+  const chg = last.close - prev.close;
+  const pct = (chg / prev.close) * 100;
+
+  return { last: last.close, change: chg, pct: pct };
+}
+
 
   // Fetch crypto from CoinGecko
   async function fetchCoinGecko(ids) {
