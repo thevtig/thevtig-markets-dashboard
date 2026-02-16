@@ -91,10 +91,10 @@
  async function fetchStooqDaily(symbol) {
   // Use a CORS-friendly proxy for Stooq (GitHub Pages often blocks direct Stooq requests)
   const stooqSym = `${symbol.toLowerCase()}.us`;
-  const rawUrl = `http://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSym)}&i=d`;
+  const rawUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSym)}&i=d`;
 
   // Jina AI proxy returns the page content with permissive CORS headers
-  const url = `https://r.jina.ai/${rawUrl}`;
+ const url = `https://r.jina.ai/http://r.jina.ai/${rawUrl}`;
 
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Stooq proxy error for ${symbol}`);
@@ -104,9 +104,9 @@
   // Extract the CSV lines from the proxy response
   // We keep only lines that look like CSV rows: YYYY-MM-DD,...
   const csvLines = text
-    .split("\n")
-    .map(l => l.trim())
-    .filter(l => /^\d{4}-\d{2}-\d{2},/.test(l));
+  .split("\n")
+  .map(l => l.trim())
+  .filter(l => l.includes(",") && /^\d{4}-\d{2}-\d{2}/.test(l));
 
   if (csvLines.length < 2) throw new Error(`Not enough CSV data for ${symbol}`);
 
@@ -164,17 +164,15 @@
             change: chg,
             pct
           });
-        } else {
-          const s = await fetchStooqDaily(m.symbol);
-          results.push({
-            ...m,
-            last: s.last,
-            change: s.change,
-            pct: s.pct
-          });
-        }
-      }
-
+        }} else {
+  try {
+    const s = await fetchStooqDaily(m.symbol);
+    results.push({ ...m, last: s.last, change: s.change, pct: s.pct });
+  } catch (err) {
+    // still render card but show unavailable
+    results.push({ ...m, last: NaN, change: NaN, pct: NaN });
+  }
+}
       // Render cards
       for (const r of results) {
         const cls = r.pct >= 0 ? "up" : "dn";
