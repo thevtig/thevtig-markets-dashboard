@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>THEVTIG | SikaFinance Live Headlines</title>
+  <style>
+    :root{
+      --green:#1b5e20;
+      --green2:#2e7d32;
+      --bg:#f7f9f8;
+      --card:#ffffff;
+      --muted:rgba(0,0,0,.65);
+      --shadow:0 6px 20px rgba(0,0,0,.06);
+      --radius:12px;
+    }
+    body{font-family:Arial, sans-serif;margin:0;background:var(--bg);color:#111;}
+    header{background:var(--green);color:#fff;padding:18px 22px;}
+    header h1{margin:0;font-size:20px;letter-spacing:.5px;}
+    header p{margin:6px 0 0;opacity:.9;}
+    .wrap{padding:18px 22px;max-width:1100px;margin:0 auto;}
+    .topbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+    button{border:0;background:var(--green2);color:#fff;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700;}
+    button:disabled{opacity:.6;cursor:not-allowed;}
+    .status{font-size:13px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    .panel{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border-top:4px solid var(--green2);overflow:hidden;}
+    .panelHead{padding:14px 14px 10px 14px;border-bottom:1px solid rgba(0,0,0,.06);}
+    .panelHead .title{font-weight:800;}
+    .panelHead .sub{margin-top:4px;font-size:12px;color:var(--muted)}
+    .list{padding:10px 14px 14px 14px;}
+    .item{padding:10px 0;border-bottom:1px solid rgba(0,0,0,.06);}
+    .item:last-child{border-bottom:none;}
+    .a{color:#111;text-decoration:none;font-weight:700;line-height:1.25;display:block;}
+    .a:hover{text-decoration:underline;}
+    .meta{margin-top:6px;font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;}
+    .badge{font-size:11px;border:1px solid rgba(0,0,0,.12);padding:2px 8px;border-radius:999px;background:#fff;}
+    .foot{margin-top:14px;font-size:12px;color:var(--muted);}
+    @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>THEVTIG — SikaFinance Live Headlines</h1>
+  <p>Auto-updated BRVM + macro headlines (public pages). Click through to read the full article.</p>
+</header>
+
+<div class="wrap">
+  <div class="topbar">
+    <button id="refreshBtn">Refresh now</button>
+    <div class="status" id="status">Loading…</div>
+    <div class="status" id="updated"></div>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <div class="panelHead">
+        <div class="title">BRVM / Bourse & Marché</div>
+        <div class="sub">Source: SikaFinance (BRVM market news page)</div>
+      </div>
+      <div class="list" id="brvmList"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panelHead">
+        <div class="title">Macroeconomics / Regional Economy</div>
+        <div class="sub">Source: SikaFinance (macro/regional economy page)</div>
+      </div>
+      <div class="list" id="macroList"></div>
+    </section>
+  </div>
+
+  <div class="foot">
+    Note: This widget displays headlines + links only. Content remains on SikaFinance. Not investment advice.
+  </div>
+</div>
+
+<script>
+  // === Pick your SikaFinance pages here (you can swap URLs any time) ===
+  const FEEDS = {
+    brvm:  "https://www.sikafinance.com/marches/actualites_bourse_brvm",
+    macro: "https://www.sikafinance.com/marches/actualites_economiques_cemac"
+  };
+
+  const refreshBtn = document.getElementById("refreshBtn");
+  const statusEl   = document.getElementById("status");
+  const updatedEl  = document.getElementById("updated");
+  const brvmList   = document.getElementById("brvmList");
+  const macroList  = document.getElementById("macroList");
+
+  function esc(s){ return String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  // GitHub Pages often blocks cross-site fetch due to CORS.
+  // We use the r.jina.ai text proxy to fetch HTML with permissive CORS.
+  function proxify(url){
+    // r.jina.ai requires http(s):// in the path. We pass the full URL.
+    return "https://r.jina.ai/" + url;
+  }
+
+  function renderItems(el, items, tag){
+    if (!items.length){
+      el.innerHTML = `<div class="item"><div class="meta"><span class="badge">No items found</span></div></div>`;
+      return;
+    }
+    el.innerHTML = items.slice(0, 12).map(x => `
+      <div class="item">
+        <a class="a" href="${esc(x.href)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>
+        <div class="meta">
+          <span class="badge">${esc(tag)}</span>
+          ${x.date ? `<span>${esc(x.date)}</span>` : ``}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  // Best-effort extraction:
+  // 1) grab all <a> links that look like /marches/<slug>_<id>
+  // 2) prefer longer titles
+  // 3) de-duplicate by href
+  function extractLikelyArticleLinks(html, baseUrl){
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const anchors = Array.from(doc.querySelectorAll("a[href]"));
+
+    const out = [];
+    const seen = new Set();
+
+    for (const a of anchors){
+      const hrefRaw = a.getAttribute("href") || "";
+      const title = (a.textContent || "").trim().replace(/\s+/g," ");
+      if (!title || title.length < 18) continue;
+
+      let href;
+      try { href = new URL(hrefRaw, baseUrl).href; } catch { continue; }
+
+      // Heuristic: sikafinance article URLs often contain "/marches/" and end with _digits
+      if (!href.includes("/marches/")) continue;
+      if (!/_\d+/.test(href)) continue;
+
+      if (seen.has(href)) continue;
+      seen.add(href);
+
+      out.push({ title, href });
+    }
+
+    // Prefer “richer” titles
+    out.sort((a,b) => b.title.length - a.title.length);
+    return out;
+  }
+
+  async function fetchPage(url){
+    const res = await fetch(proxify(url), { cache: "no-store" });
+    if (!res.ok) throw new Error("Fetch failed: " + url);
+    return await res.text();
+  }
+
+  async function refresh(){
+    refreshBtn.disabled = true;
+    statusEl.textContent = "Refreshing…";
+    updatedEl.textContent = "";
+
+    try{
+      const [brvmHtml, macroHtml] = await Promise.all([
+        fetchPage(FEEDS.brvm),
+        fetchPage(FEEDS.macro),
+      ]);
+
+      const brvmItems  = extractLikelyArticleLinks(brvmHtml,  FEEDS.brvm);
+      const macroItems = extractLikelyArticleLinks(macroHtml, FEEDS.macro);
+
+      renderItems(brvmList, brvmItems, "BRVM");
+      renderItems(macroList, macroItems, "Macro");
+
+      statusEl.textContent = "Headlines loaded.";
+      updatedEl.textContent = "Last updated: " + new Date().toLocaleString();
+    } catch (e){
+      console.error(e);
+      statusEl.textContent = "Error loading SikaFinance. Try refresh.";
+      brvmList.innerHTML = `<div class="item"><div class="meta"><span class="badge">Error</span><span>Could not load BRVM headlines</span></div></div>`;
+      macroList.innerHTML = `<div class="item"><div class="meta"><span class="badge">Error</span><span>Could not load macro headlines</span></div></div>`;
+    } finally{
+      refreshBtn.disabled = false;
+    }
+  }
+
+  refreshBtn.addEventListener("click", refresh);
+  refresh();
+
+  // Auto refresh every 30 minutes (not too aggressive)
+  setInterval(refresh, 30 * 60 * 1000);
+</script>
+</body>
+</html>
